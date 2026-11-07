@@ -1,7 +1,7 @@
 'use strict';
 // Shared helpers: formatting, dates, parsing, CSV, downloads.
 window.App = window.App || {};
-App.VERSION = '1.1 (7 Nov 2026)'; // shown in Settings, so you can tell which version the phone runs
+App.VERSION = '1.2 (7 Nov 2026)'; // shown in Settings, so you can tell which version the phone runs
 
 App.util = (function () {
   const U = {};
@@ -158,6 +158,35 @@ App.util = (function () {
   });
 
   U.debounce = (fn, ms) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; };
+
+  // ---------- Password encryption (backups) ----------
+  // AES-256-GCM with a key derived from the password by PBKDF2-SHA256. GCM also detects a wrong password or a damaged file.
+  const ENC_FORMAT = 'clarity-encrypted';
+  const toB64 = (bytes) => {
+    let s = '';
+    for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+    return btoa(s);
+  };
+  const fromB64 = (b64) => Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+  async function deriveKey(password, salt, iterations) {
+    const base = await crypto.subtle.importKey('raw', new TextEncoder().encode(password), 'PBKDF2', false, ['deriveKey']);
+    return crypto.subtle.deriveKey({ name: 'PBKDF2', hash: 'SHA-256', salt, iterations }, base, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
+  }
+  U.isEncrypted = (obj) => !!obj && obj.format === ENC_FORMAT;
+  U.encryptText = async (text, password) => {
+    const salt = crypto.getRandomValues(new Uint8Array(16));
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const iterations = 600000;
+    const key = await deriveKey(password, salt, iterations);
+    const data = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, new TextEncoder().encode(text)));
+    return JSON.stringify({ format: ENC_FORMAT, version: 1, cipher: 'AES-256-GCM', kdf: 'PBKDF2-SHA256', iterations, salt: toB64(salt), iv: toB64(iv), data: toB64(data) });
+  };
+  // Rejects when the password is wrong.
+  U.decryptText = async (obj, password) => {
+    const key = await deriveKey(password, fromB64(obj.salt), obj.iterations);
+    const plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: fromB64(obj.iv) }, key, fromB64(obj.data));
+    return new TextDecoder().decode(plain);
+  };
 
   return U;
 })();
