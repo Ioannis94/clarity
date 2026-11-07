@@ -5,10 +5,34 @@ App.views.data = (function () {
   const U = App.util, S = App.store, ui = App.ui;
 
   // ---------- Export ----------
+  // Asks for a password, then saves the backup encrypted with it (or as plain text, if the user chooses).
+  function exportBackup() {
+    ui.modal({
+      title: 'Save backup',
+      submitLabel: 'Save backup',
+      body: `
+        <p class="secondary small">Protect the backup with a password, so nobody who gets the file (for example from Google Drive) can read it.</p>
+        <div class="field"><label for="b-pw">Password</label><input id="b-pw" name="pw" type="password" autocomplete="new-password" autofocus></div>
+        <div class="field"><label for="b-pw2">Repeat password</label><input id="b-pw2" name="pw2" type="password" autocomplete="new-password"></div>
+        <p class="note">${ui.icon('alert')} Write the password down somewhere safe. If you forget it, the backup can't be opened by anyone, including you.</p>`,
+      leftButtons: '<button type="button" class="btn ghost" data-plain>Save without password</button>',
+      onOpen(form) {
+        form.querySelector('[data-plain]').addEventListener('click', () => { ui.closeModal(); saveBackupFile(S.exportJSON()); });
+      },
+      async onSubmit(form) {
+        const f = form.elements;
+        if (f.pw.value.length < 8) return ui.fieldError(form, 'pw', 'Use at least 8 characters.');
+        if (f.pw.value !== f.pw2.value) return ui.fieldError(form, 'pw2', "The passwords don't match.");
+        const btn = form.querySelector('button[type="submit"]');
+        btn.disabled = true;
+        btn.textContent = 'Encrypting…';
+        await saveBackupFile(await U.encryptText(S.exportJSON(), f.pw.value));
+      },
+    });
+  }
   // On a phone this opens the share sheet (Google Drive, Gmail…); elsewhere it downloads the file.
-  async function exportBackup() {
+  async function saveBackupFile(json) {
     const name = `clarity-backup-${U.today()}.json`;
-    const json = S.exportJSON();
     const done = (msg) => { localStorage.setItem('clarity.lastBackup', U.today()); ui.toast(msg); App.render(); };
     if (navigator.canShare) {
       for (const type of ['application/json', 'text/plain']) {
@@ -52,6 +76,10 @@ App.views.data = (function () {
   async function restore(file) {
     let data;
     try { data = JSON.parse(await U.readFile(file)); } catch (e) { ui.toast('That file is not a valid backup.', 'error'); return; }
+    if (U.isEncrypted(data)) {
+      data = await askBackupPassword(data);
+      if (!data) return;
+    }
     if (!data || !Array.isArray(data.transactions) || !Array.isArray(data.accounts)) { ui.toast('That file is not a Clarity backup.', 'error'); return; }
     const ok = await ui.confirm(`Replace all current data with this backup (${data.transactions.length} transactions, ${data.accounts.length} accounts)? Your current data will be lost unless you export it first.`,
       { title: 'Restore backup?', okLabel: 'Replace my data' });
@@ -59,6 +87,31 @@ App.views.data = (function () {
     S.replaceAll(data);
     App.applyTheme();
     ui.toast('Backup restored');
+  }
+
+  // Resolves with the decrypted backup, or null if the user cancels.
+  function askBackupPassword(encrypted) {
+    return new Promise((resolve) => {
+      let result = null;
+      ui.modal({
+        title: 'Open protected backup',
+        submitLabel: 'Open',
+        body: `
+          <p class="secondary small">This backup is protected with a password.</p>
+          <div class="field"><label for="r-pw">Password</label><input id="r-pw" name="pw" type="password" autocomplete="current-password" autofocus></div>`,
+        onClose: () => resolve(result),
+        async onSubmit(form) {
+          const btn = form.querySelector('button[type="submit"]');
+          btn.disabled = true;
+          try {
+            result = JSON.parse(await U.decryptText(encrypted, form.elements.pw.value));
+          } catch (e) {
+            btn.disabled = false;
+            return ui.fieldError(form, 'pw', 'Wrong password, or the file is damaged.');
+          }
+        },
+      });
+    });
   }
 
   // ---------- CSV import ----------
