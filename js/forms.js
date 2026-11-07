@@ -172,12 +172,20 @@ App.forms = (function () {
         <div class="field"><label for="a-name">Name</label><input id="a-name" name="name" value="${U.esc(v.name)}" placeholder="e.g. Piraeus Bank, Revolut, Wallet" autofocus></div>
         <div class="row">
           <div class="field"><label for="a-type">Type</label><select id="a-type" name="type">${ui.options(Object.entries(S.ACCOUNT_TYPES), v.type)}</select></div>
-          <div class="field"><label for="a-open">Starting balance (€)</label><input id="a-open" name="opening" inputmode="decimal" value="${U.esc(U.centsToInput(v.opening))}">
+          <div class="field" data-opening><label for="a-open">Starting balance (€)</label><input id="a-open" name="opening" inputmode="decimal" value="${U.esc(U.centsToInput(v.opening))}">
             <span class="hint">Balance before your first entry. Use a minus sign for card debt.</span></div>
+          <p class="note" data-broker-note>A broker account is worth its holdings only. Add your purchases under Investments.</p>
         </div>
         ${editing ? `<label class="check"><input type="checkbox" name="archived"${v.archived ? ' checked' : ''}> Archived (hidden from forms, still counted in net worth)</label>` : ''}`,
       leftButtons: editing ? `<button type="button" class="btn ghost danger-text" data-delete>${ui.icon('trash')} Delete</button>` : '',
       onOpen(form) {
+        const syncType = () => {
+          const broker = form.elements.type.value === 'broker';
+          form.querySelector('[data-opening]').hidden = broker;
+          form.querySelector('[data-broker-note]').hidden = !broker;
+        };
+        form.elements.type.addEventListener('change', syncType);
+        syncType();
         const del = form.querySelector('[data-delete]');
         if (del) del.addEventListener('click', async () => {
           if (S.accountInUse(acc.id)) { ui.toast('This account has entries. Archive it instead.', 'error'); return; }
@@ -226,7 +234,7 @@ App.forms = (function () {
           <div class="field"><label for="t-fees">Fees (€)</label><input id="t-fees" name="fees" inputmode="decimal" value="${U.esc(U.centsToInput(v.fees))}"></div>
         </div>
         <div class="field"><label for="t-acc">Account</label><select id="t-acc" name="accountId">${ui.options(accOpts, v.accountId)}</select>
-          <span class="hint">The cost is taken from this account's cash (a sale adds to it). Transfer money into your broker account first.</span></div>
+          <span class="hint">A broker account counts only its holdings. Any other account pays the cost from its balance (a sale adds to it).</span></div>
         <div class="field"><label for="t-note">Note</label><input id="t-note" name="note" value="${U.esc(v.note)}" placeholder="Optional"></div>
         <p class="note" data-total>Total: —</p>`,
       leftButtons: editing ? `<button type="button" class="btn ghost danger-text" data-delete>${ui.icon('trash')} Delete</button>` : '',

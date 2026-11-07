@@ -345,20 +345,24 @@ App.store = (function () {
   }
 
   // ---------- Balances & statistics ----------
-  // Cash balance of every account at the end of `date` (inclusive).
+  // Broker accounts are worth their holdings only: money moved in or out and trade cash don't count.
+  const holdingsOnly = (id) => { const a = account(id); return !!a && a.type === 'broker'; };
+
+  // Cash balance of every account at the end of `date` (inclusive). Always 0 for broker accounts.
   function balances(date = '9999-12-31') {
     const b = {};
-    for (const a of state.accounts) b[a.id] = a.opening || 0;
+    for (const a of state.accounts) b[a.id] = a.type === 'broker' ? 0 : a.opening || 0;
+    const add = (id, cents) => { if (!holdingsOnly(id)) b[id] = (b[id] || 0) + cents; };
     for (const t of state.transactions) {
       if (t.date > date) continue;
-      if (t.type === 'income') b[t.accountId] = (b[t.accountId] || 0) + t.amount;
-      else if (t.type === 'expense') b[t.accountId] = (b[t.accountId] || 0) - t.amount;
+      if (t.type === 'income') add(t.accountId, t.amount);
+      else if (t.type === 'expense') add(t.accountId, -t.amount);
       else if (t.type === 'transfer') {
-        b[t.accountId] = (b[t.accountId] || 0) - t.amount;
-        b[t.toAccountId] = (b[t.toAccountId] || 0) + t.amount;
+        add(t.accountId, -t.amount);
+        add(t.toAccountId, t.amount);
       }
     }
-    for (const t of state.trades) if (t.date <= date) b[t.accountId] = (b[t.accountId] || 0) + tradeCash(t);
+    for (const t of state.trades) if (t.date <= date) add(t.accountId, tradeCash(t));
     return b;
   }
   function netWorth(date = U.today()) {
