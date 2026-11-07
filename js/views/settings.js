@@ -55,6 +55,7 @@ App.views.settings = (function () {
           <div class="card-head"><h2>About your data</h2></div>
           <p class="secondary small">Everything is saved in this browser's local storage on this device (${(S.bytesUsed() / 1024).toFixed(0)} KB used). Nothing is sent anywhere. Clearing your browser's site data, or using a different browser, means starting empty, so keep a backup from <a href="#/data">Import & export</a>.</p>
           <p class="secondary small">Shortcut: press <span class="kbd">N</span> anywhere to add a transaction.</p>
+          <p class="secondary small">Clarity version ${U.esc(App.VERSION)}</p>
         </div>
       </div>`;
 

@@ -37,7 +37,7 @@ App.views.accounts = (function () {
             </div>
             <div class="acc-name">${U.esc(a.name)}</div>
             <div class="acc-balance ${cash + inv < 0 ? 'neg' : ''}">${U.money(cash + inv)}</div>
-            ${a.type === 'broker' || inv ? `<div class="small muted">Cash ${U.money(cash)} · Holdings ${U.money(inv)}</div>` : ''}
+            ${a.type === 'broker' ? '<div class="small muted">Holdings at current prices</div>' : inv ? `<div class="small muted">Cash ${U.money(cash)} · Holdings ${U.money(inv)}</div>` : ''}
           </div>`;
         }).join('')}</div>`).join('')}
       ${!st.accounts.length ? '<div class="card empty-state"><h2>No accounts</h2><p>Add a bank account, card, cash wallet or broker account to start.</p></div>' : ''}

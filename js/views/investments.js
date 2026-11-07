@@ -24,7 +24,7 @@ App.views.investments = (function () {
       ${!st.trades.length ? `
         <div class="card empty-state"><h2>Track your investments</h2>
           <p>Record each buy and sell (stocks, ETFs, funds, crypto…). The app works out your average cost and profit or loss. Update prices whenever you like.</p>
-          <p class="small muted">Tip: create an account of type “Investment / broker” and transfer money into it, so purchases come out of that account's cash.</p>
+          <p class="small muted">Tip: create an account of type “Investment / broker” for your trades. It counts toward net worth with the value of its holdings only.</p>
           <button class="btn primary" data-trade2>${ui.icon('plus')} Add your first trade</button>
           ${!st.accounts.some((a) => a.type === 'broker') ? ' <button class="btn" data-broker>New broker account</button>' : ''}
         </div>` : `
@@ -40,17 +40,18 @@ App.views.investments = (function () {
       <div class="card flush" style="margin-bottom:16px">
         <div class="card-head"><h2>Holdings</h2></div>
         <div class="table-wrap" style="margin:0;padding:0 8px"><table class="table">
-          <thead><tr><th>Asset</th><th class="num">Quantity</th><th class="num">Avg cost</th><th class="num">Price</th><th class="num">Value</th><th class="num">Gain/loss</th><th class="num">Weight</th></tr></thead>
+          <thead><tr><th>Asset</th><th class="num">Quantity</th><th class="num">Avg cost</th><th class="num">Cost basis</th><th class="num">Price</th><th class="num">Value</th><th class="num">Gain/loss</th><th class="num">Weight</th></tr></thead>
           <tbody>${open.map((h) => `
             <tr class="clickable" data-sym="${U.esc(h.symbol)}" title="Update price">
               <td><strong>${U.esc(h.symbol)}</strong><div class="small muted truncate" style="max-width:220px">${U.esc(h.asset.name)} · ${U.esc(S.ASSET_KINDS[h.asset.kind] || h.asset.kind)}</div></td>
               <td class="num">${qty(h.qty)}</td>
               <td class="num">${unitPrice(h.avgCost)}</td>
+              <td class="num">${U.money(h.cost)}</td>
               <td class="num">${unitPrice(h.price)}<div class="small muted">${h.priceDate ? U.fmtDate(h.priceDate) : ''}</div></td>
               <td class="num"><strong>${U.money(h.value)}</strong></td>
               <td class="num ${plClass(h.unrealized)}">${U.signed(Math.round(h.unrealized))}<div class="small">${h.cost ? (h.unrealized >= 0 ? '+' : '') + U.pct(h.unrealized / h.cost) : ''}</div></td>
               <td class="num">${pf.value ? U.pct(h.value / pf.value) : '—'}</td>
-            </tr>`).join('') || '<tr><td colspan="7" class="empty">No open positions.</td></tr>'}</tbody>
+            </tr>`).join('') || '<tr><td colspan="8" class="empty">No open positions.</td></tr>'}</tbody>
         </table></div>
       </div>
       <div class="grid grid-2" style="margin-bottom:16px">
