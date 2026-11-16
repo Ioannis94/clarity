@@ -191,6 +191,18 @@ a:hover { text-decoration: underline; }
 .stat-delta { font-size: 13px; margin-top: 2px; color: var(--muted); }
 @media (max-width: 520px) { .hero-value { font-size: 40px; } .stat-value { font-size: 20px; } .card { padding: 14px; } }
 
+/* Hidden amounts on the dashboard: blurred until shown (per card, or all at once) */
+.secret-box { position: relative; }
+.secret-box > .secret-btn { position: absolute; top: 6px; right: 6px; }
+.secret-box .card-head, .secret-box > .stat-label { padding-right: 34px; }
+.secret-box.flush .card-head { padding-right: 46px; }
+.secret-box.hero { padding-right: 40px; }
+.secret { transition: filter 0.2s; }
+.secret-box.is-hidden { cursor: pointer; }
+.secret-box.is-hidden .secret { filter: blur(0.45em); user-select: none; }
+.secret-box.is-hidden .secret.block { filter: blur(10px); opacity: 0.7; }
+@media (prefers-reduced-motion: reduce) { .secret { transition: none; } }
+
 /* ---------- Controls ---------- */
 .btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 38px; padding: 0 14px; border-radius: 8px;
