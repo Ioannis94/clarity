@@ -6,6 +6,54 @@ App.views.dashboard = (function () {
   let month = U.thisMonth();
   const QUOTE = '<p class="tagline">“What gets measured gets managed”</p>';
 
+  // Amounts start hidden each time the app is opened or comes back from the background.
+  const shown = new Set();
+  const secretBtn = '<button type="button" class="icon-btn secret-btn" data-secret-toggle></button>';
+  function applySecret(box, hidden) {
+    box.classList.toggle('is-hidden', hidden);
+    box.querySelectorAll('.secret').forEach((el) => { el.inert = hidden; });
+    const btn = box.querySelector('[data-secret-toggle]');
+    btn.innerHTML = ui.icon(hidden ? 'eye' : 'eye-off');
+    btn.setAttribute('aria-label', hidden ? 'Show amounts' : 'Hide amounts');
+    btn.title = hidden ? 'Show' : 'Hide';
+  }
+  function syncAllButton(root) {
+    const btn = root.querySelector('[data-secret-all]');
+    if (!btn) return;
+    const anyHidden = !!root.querySelector('.secret-box.is-hidden');
+    btn.innerHTML = `${ui.icon(anyHidden ? 'eye' : 'eye-off')} ${anyHidden ? 'Show all' : 'Hide all'}`;
+  }
+  function setSecret(root, box, hidden) {
+    if (hidden) shown.delete(box.dataset.secret); else shown.add(box.dataset.secret);
+    applySecret(box, hidden);
+    syncAllButton(root);
+  }
+  function wireSecrets(root) {
+    root.querySelectorAll('.secret-box').forEach((box) => applySecret(box, !shown.has(box.dataset.secret)));
+    syncAllButton(root);
+    root.querySelector('[data-secret-all]').addEventListener('click', () => {
+      const hide = !root.querySelector('.secret-box.is-hidden');
+      root.querySelectorAll('.secret-box').forEach((box) => setSecret(root, box, hide));
+    });
+    // Tapping a hidden card shows it instead of opening what's under the blur; links in card headers still work.
+    root.addEventListener('click', (e) => {
+      const box = e.target.closest('.secret-box');
+      if (!box) return;
+      if (e.target.closest('[data-secret-toggle]')) { e.preventDefault(); setSecret(root, box, !box.classList.contains('is-hidden')); return; }
+      if (box.classList.contains('is-hidden') && !e.target.closest('.card-head a')) {
+        e.preventDefault();
+        e.stopPropagation();
+        setSecret(root, box, false);
+      }
+    }, true);
+  }
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) return;
+    shown.clear();
+    const root = document.querySelector('[data-dash]');
+    if (root) { root.querySelectorAll('.secret-box').forEach((box) => applySecret(box, true)); syncAllButton(root); }
+  });
+
   function welcome(root) {
     root.innerHTML = `
       <div class="page-head"><div><h1>Welcome to Clarity</h1>${QUOTE}</div></div>
@@ -39,35 +87,36 @@ App.views.dashboard = (function () {
     const backupAge = App.views.data.daysSinceBackup();
     const needsBackup = backupAge == null || backupAge > 14;
 
-    root.innerHTML = `
-      <div class="page-head"><div><h1>Dashboard</h1>${QUOTE}</div><div class="actions" data-month></div></div>
+    root.innerHTML = `<div data-dash>
+      <div class="page-head"><div><h1>Dashboard</h1>${QUOTE}</div><div class="actions"><button type="button" class="btn" data-secret-all></button><span data-month></span></div></div>
       ${needsBackup ? `<div class="note backup-note">${ui.icon('alert')}<span>${backupAge == null ? 'You haven’t saved a backup yet.' : `Last backup was ${backupAge} days ago.`} Your data lives only on this phone.</span>
         <button class="btn small primary" data-backup>Save backup</button></div>` : ''}
-      <div class="hero">
-        <div><div class="hero-label">Net worth</div><div class="hero-value">${U.money(nw.total)}</div>
-          <div class="stat-delta"><span class="${nwChange >= 0 ? 'pos' : 'neg'}">${U.signed(nwChange)}</span> since ${U.fmtDate(prevEnd)}</div></div>
-        <div class="hero-parts"><span>Cash & accounts <strong>${U.money(nw.cash)}</strong></span><span>Investments <strong>${U.money(nw.invest)}</strong></span></div>
+      <div class="hero secret-box" data-secret="hero">${secretBtn}
+        <div><div class="hero-label">Net worth</div><div class="hero-value secret">${U.money(nw.total)}</div>
+          <div class="stat-delta secret"><span class="${nwChange >= 0 ? 'pos' : 'neg'}">${U.signed(nwChange)}</span> since ${U.fmtDate(prevEnd)}</div></div>
+        <div class="hero-parts"><span>Cash & accounts <strong class="secret">${U.money(nw.cash)}</strong></span><span>Investments <strong class="secret">${U.money(nw.invest)}</strong></span></div>
       </div>
       <div class="grid grid-4" style="margin-bottom:16px">
-        <a class="card" href="#/transactions?type=income&month=${month}" style="color:inherit;text-decoration:none"><div class="stat-label">Income · ${U.monthShort(month)}</div><div class="stat-value">${U.money(cur.income)}</div>
-          <div class="stat-delta">${prev.income ? `${U.money(prev.income)} in ${U.monthShort(U.addMonths(month, -1))}` : '&nbsp;'}</div></a>
-        <a class="card" href="#/transactions?type=expense&month=${month}" style="color:inherit;text-decoration:none"><div class="stat-label">Expenses · ${U.monthShort(month)}</div><div class="stat-value">${U.money(cur.expense)}</div>
-          <div class="stat-delta">${expDelta == null ? '&nbsp;' : `<span class="${expDelta > 0 ? 'neg' : 'pos'}">${expDelta > 0 ? '▲' : '▼'} ${U.pct(Math.abs(expDelta), 0)}</span> vs ${U.monthShort(U.addMonths(month, -1))}`}</div></a>
-        <div class="card"><div class="stat-label">Saved · ${U.monthShort(month)}</div><div class="stat-value ${net < 0 ? 'neg' : ''}">${U.signed(net)}</div><div class="stat-delta">income minus expenses</div></div>
-        <div class="card"><div class="stat-label">Savings rate</div><div class="stat-value ${rate < 0 ? 'neg' : ''}">${cur.income ? U.pct(rate, 0) : '—'}</div><div class="stat-delta">of income kept</div></div>
+        <a class="card secret-box" data-secret="income" href="#/transactions?type=income&month=${month}" style="color:inherit;text-decoration:none">${secretBtn}<div class="stat-label">Income · ${U.monthShort(month)}</div><div class="stat-value secret">${U.money(cur.income)}</div>
+          <div class="stat-delta secret">${prev.income ? `${U.money(prev.income)} in ${U.monthShort(U.addMonths(month, -1))}` : '&nbsp;'}</div></a>
+        <a class="card secret-box" data-secret="expense" href="#/transactions?type=expense&month=${month}" style="color:inherit;text-decoration:none">${secretBtn}<div class="stat-label">Expenses · ${U.monthShort(month)}</div><div class="stat-value secret">${U.money(cur.expense)}</div>
+          <div class="stat-delta secret">${expDelta == null ? '&nbsp;' : `<span class="${expDelta > 0 ? 'neg' : 'pos'}">${expDelta > 0 ? '▲' : '▼'} ${U.pct(Math.abs(expDelta), 0)}</span> vs ${U.monthShort(U.addMonths(month, -1))}`}</div></a>
+        <div class="card secret-box" data-secret="saved">${secretBtn}<div class="stat-label">Saved · ${U.monthShort(month)}</div><div class="stat-value secret ${net < 0 ? 'neg' : ''}">${U.signed(net)}</div><div class="stat-delta">income minus expenses</div></div>
+        <div class="card secret-box" data-secret="rate">${secretBtn}<div class="stat-label">Savings rate</div><div class="stat-value secret ${rate < 0 ? 'neg' : ''}">${cur.income ? U.pct(rate, 0) : '—'}</div><div class="stat-delta">of income kept</div></div>
       </div>
       <div class="grid grid-2" style="margin-bottom:16px">
-        <div class="card"><div class="card-head"><h2>Income vs expenses</h2><span class="sub">12 months</span></div><div data-cols></div></div>
-        <div class="card"><div class="card-head"><h2>Net worth</h2><span class="sub">month-end</span></div><div data-nw></div></div>
+        <div class="card secret-box" data-secret="cols">${secretBtn}<div class="card-head"><h2>Income vs expenses</h2><span class="sub">12 months</span></div><div class="secret block" data-cols></div></div>
+        <div class="card secret-box" data-secret="nw">${secretBtn}<div class="card-head"><h2>Net worth</h2><span class="sub">month-end</span></div><div class="secret block" data-nw></div></div>
       </div>
       <div class="grid grid-2" style="margin-bottom:16px">
-        <div class="card"><div class="card-head"><h2>Spending by category</h2><span class="sub">${U.monthLabel(month)}</span></div><div data-cats></div></div>
-        <div class="card"><div class="card-head"><h2>Budgets</h2><a class="small" href="#/budgets">See all</a></div><div data-budgets></div></div>
+        <div class="card secret-box" data-secret="cats">${secretBtn}<div class="card-head"><h2>Spending by category</h2><span class="sub">${U.monthLabel(month)}</span></div><div class="secret block" data-cats></div></div>
+        <div class="card secret-box" data-secret="budgets">${secretBtn}<div class="card-head"><h2>Budgets</h2><a class="small" href="#/budgets">See all</a></div><div class="secret block" data-budgets></div></div>
       </div>
       <div class="grid grid-2">
-        <div class="card flush"><div class="card-head"><h2>Recent transactions</h2><a class="small" href="#/transactions">See all</a></div><div data-recent style="margin-top:8px"></div></div>
-        <div class="card"><div class="card-head"><h2>Accounts</h2><a class="small" href="#/accounts">Manage</a></div><div data-accounts></div></div>
-      </div>`;
+        <div class="card flush secret-box" data-secret="recent">${secretBtn}<div class="card-head"><h2>Recent transactions</h2><a class="small" href="#/transactions">See all</a></div><div class="secret block" data-recent style="margin-top:8px"></div></div>
+        <div class="card secret-box" data-secret="accounts">${secretBtn}<div class="card-head"><h2>Accounts</h2><a class="small" href="#/accounts">Manage</a></div><div class="secret block" data-accounts></div></div>
+      </div></div>`;
+    wireSecrets(root.querySelector('[data-dash]'));
 
     root.querySelector('[data-month]').appendChild(ui.monthSwitcher(month, (m) => { month = m; render(root); }));
     const backupBtn = root.querySelector('[data-backup]');
