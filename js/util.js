@@ -1,7 +1,7 @@
 'use strict';
 // Shared helpers: formatting, dates, parsing, CSV, downloads.
 window.App = window.App || {};
-App.VERSION = '1.2 (7 Nov 2026)'; // shown in Settings, so you can tell which version the phone runs
+App.VERSION = '1.3 (16 Nov 2026)'; // shown in Settings, so you can tell which version the phone runs
 
 App.util = (function () {
   const U = {};
